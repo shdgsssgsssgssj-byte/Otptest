@@ -10,23 +10,20 @@ import threading
 app = Flask(__name__)
 
 # iVASMS credentials from environment variables
-IVASMS_EMAIL = os.environ.get('IVASMS_EMAIL', '')
-IVASMS_PASSWORD = os.environ.get('IVASMS_PASSWORD', '')
+IVASMS_EMAIL = os.environ.get('IVASMS_EMAIL', 'deedaralee17@gmail.com')
+IVASMS_PASSWORD = os.environ.get('IVASMS_PASSWORD', 'Mallah123+')
 SESSION_COOKIE = None
 LAST_LOGIN_TIME = None
 LOGIN_STATUS = False
 
 # Store data
 otps = []
-numbers_list = []  # This will auto-sync from iVASMS
+numbers_list = []
 otp_cache = set()
 LAST_CHECK_TIME = None
 LAST_NUMBERS_SYNC = None
 
-# Auto-refresh login ka timer
-AUTO_REFRESH_ACTIVE = True
-
-# HTML Template
+# HTML Template (Clean version without duplicate times)
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -67,12 +64,6 @@ HTML_TEMPLATE = """
         .status-online { background: #10b981; color: white; }
         .status-offline { background: #ef4444; color: white; }
         .status-warning { background: #f59e0b; color: white; }
-        .status-refresh { background: #3b82f6; color: white; animation: pulse 1s infinite; }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
         .stats { display: flex; gap: 20px; flex-wrap: wrap; }
         .stat {
             background: #f3f4f6;
@@ -226,10 +217,15 @@ HTML_TEMPLATE = """
             border-radius: 20px;
             margin-left: 10px;
         }
-        .number-count {
-            font-size: 14px;
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 12px;
             color: #6b7280;
-            margin-left: 10px;
         }
         @media (max-width: 600px) {
             .otp-table th, .otp-table td {
@@ -240,7 +236,6 @@ HTML_TEMPLATE = """
             button { padding: 8px 16px; font-size: 12px; }
             .card { padding: 15px; }
             .header { padding: 15px; }
-            .number-item { font-size: 11px; padding: 8px 10px; }
         }
     </style>
 </head>
@@ -257,21 +252,22 @@ HTML_TEMPLATE = """
                     </div>
                     <div class="stat">
                         <div class="stat-value" id="numberCount">0</div>
-                        <div class="stat-label">Auto-Synced Numbers</div>
+                        <div class="stat-label">Numbers from iVASMS</div>
                     </div>
                 </div>
-                <div class="last-check" id="lastCheck" style="font-size:12px;color:#6b7280;"></div>
             </div>
-            <div style="font-size:11px; color:#6b7280; margin-top:10px;">
-                🔄 Auto-Sync Numbers: iVASMS ki "My Numbers" list khud ba khud update hoti hai | Auto-Login: Session expire hone par refresh
+            <div class="info-row">
+                <span>🔄 Last OTP Check: <span id="lastCheck">--:--:--</span></span>
+                <span>📞 Last Numbers Sync: <span id="lastSync">--:--:--</span></span>
+                <span>🔐 Last Login: <span id="lastLogin">--:--:--</span></span>
             </div>
         </div>
         
         <div class="grid">
             <div class="card">
                 <div class="card-title">
-                    <span>📞 Numbers List <span class="number-count" id="numberCountDisplay">(Auto-Synced from iVASMS)</span></span>
-                    <span class="sync-badge" id="syncBadge">🔄 Auto-Sync</span>
+                    <span>📞 Numbers from iVASMS <span id="numberCountBadge"></span></span>
+                    <span class="sync-badge">🔄 Auto-Sync (30 min)</span>
                 </div>
                 <div class="control-buttons">
                     <button onclick="checkNow()" id="checkBtn" class="btn-success">🔄 Check OTPs</button>
@@ -280,10 +276,10 @@ HTML_TEMPLATE = """
                 </div>
                 <div class="numbers-list" id="numbersList">
                     <div class="empty-state">
-                        <div class="loading"></div> Syncing numbers from iVASMS...
+                        <div class="loading"></div> Loading numbers from iVASMS...
                     </div>
                 </div>
-                <div class="auto-refresh" style="margin-top: 10px;">
+                <div class="auto-refresh">
                     💡 Numbers automatically sync from iVASMS "My Numbers" every 30 minutes
                 </div>
             </div>
@@ -296,7 +292,7 @@ HTML_TEMPLATE = """
                     </div>
                 </div>
                 <div class="auto-refresh">
-                    🔄 Click on OTP to copy | Numbers auto-sync every 30 min | Login auto-refresh every 10 min
+                    🔄 Click on OTP to copy | Auto-sync every 30 min | Auto-login every 10 min
                 </div>
             </div>
         </div>
@@ -317,25 +313,24 @@ HTML_TEMPLATE = """
                 const data = await res.json();
                 document.getElementById('otpCount').innerText = data.total_otps;
                 document.getElementById('numberCount').innerText = data.total_numbers;
-                document.getElementById('numberCountDisplay').innerHTML = `(${data.total_numbers} numbers from iVASMS)`;
+                
+                if (data.last_check) {
+                    document.getElementById('lastCheck').innerHTML = data.last_check;
+                }
+                if (data.last_numbers_sync) {
+                    document.getElementById('lastSync').innerHTML = data.last_numbers_sync;
+                }
+                if (data.last_login) {
+                    document.getElementById('lastLogin').innerHTML = data.last_login;
+                }
                 
                 const statusEl = document.getElementById('monitorStatus');
                 if (data.logged_in) {
                     statusEl.innerHTML = '🟢 iVASMS Connected (Auto-Sync)';
                     statusEl.className = 'status-badge status-online';
                 } else {
-                    statusEl.innerHTML = '🟡 Auto-Login Attempting...';
-                    statusEl.className = 'status-badge status-refresh';
-                }
-                
-                if (data.last_check) {
-                    document.getElementById('lastCheck').innerHTML = `Last OTP check: ${data.last_check}`;
-                }
-                if (data.last_numbers_sync) {
-                    document.getElementById('lastCheck').innerHTML += ` | Numbers sync: ${data.last_numbers_sync}`;
-                }
-                if (data.last_login) {
-                    document.getElementById('lastCheck').innerHTML += ` | Login: ${data.last_login}`;
+                    statusEl.innerHTML = '🟡 Connecting to iVASMS...';
+                    statusEl.className = 'status-badge status-warning';
                 }
             } catch(e) {
                 console.error('Status fetch error:', e);
@@ -357,6 +352,7 @@ HTML_TEMPLATE = """
                 const res = await fetch('/api/numbers');
                 const numbers = await res.json();
                 updateNumbersList(numbers);
+                document.getElementById('numberCountBadge').innerHTML = `(${numbers.length} numbers)`;
             } catch(e) {
                 console.error('Numbers fetch error:', e);
             }
@@ -389,7 +385,7 @@ HTML_TEMPLATE = """
             const container = document.getElementById('otpTable');
             
             if (!otps || otps.length === 0) {
-                container.innerHTML = '<div class="empty-state">📭 No OTPs yet. Click "Check OTPs" to fetch from iVASMS!</div>';
+                container.innerHTML = '<div class="empty-state">📭 No OTPs yet. Click "Check OTPs" to fetch!</div>';
                 return;
             }
             
@@ -400,12 +396,11 @@ HTML_TEMPLATE = """
                         <th>OTP</th>
                         <th>Phone</th>
                         <th>Service</th>
-                    </tr>
-                </thead>
+                    </thead>
                 <tbody>`;
             
             for (let otp of otps) {
-                html += `<tr>
+                html += `——
                     <td style="font-size: 12px;">${otp.time}</td>
                     <td><span class="otp-code" onclick="copyOTP('${otp.otp}')">📋 ${otp.otp}</span></td>
                     <td><code>${otp.phone}</code></td>
@@ -428,20 +423,21 @@ HTML_TEMPLATE = """
             
             let html = '';
             for (let item of numbers) {
-                let countryFlag = '';
-                let countryCode = item.number.substring(0, 4);
-                if (countryCode === '2137') countryFlag = '🇩🇿';
-                else if (countryCode === '923') countryFlag = '🇵🇰';
-                else if (countryCode === '966') countryFlag = '🇸🇦';
-                else countryFlag = '📱';
+                let flag = '📱';
+                let number = item.number;
+                
+                if (number.startsWith('+213')) flag = '🇩🇿';
+                else if (number.startsWith('+92')) flag = '🇵🇰';
+                else if (number.startsWith('+966')) flag = '🇸🇦';
+                else if (number.startsWith('+1')) flag = '🇺🇸';
+                else if (number.startsWith('+44')) flag = '🇬🇧';
                 
                 html += `<div class="number-item">
                     <div>
-                        <span style="font-size:16px; margin-right:8px;">${countryFlag}</span>
-                        <code>${item.number}</code>
-                        ${item.country ? `<span class="country-badge">${item.country}</span>` : ''}
+                        <span style="font-size:18px; margin-right:10px;">${flag}</span>
+                        <code style="font-size:14px;">${number}</code>
                     </div>
-                    <div style="font-size:11px; color:#9ca3af;">${item.source || 'iVASMS'}</div>
+                    <div style="font-size:11px; color:#10b981;">✓ Active</div>
                 </div>`;
             }
             container.innerHTML = html;
@@ -512,7 +508,7 @@ HTML_TEMPLATE = """
 """
 
 def login_ivasms():
-    """Login to iVASMS and get session cookie"""
+    """Login to iVASMS"""
     global SESSION_COOKIE, LAST_LOGIN_TIME, LOGIN_STATUS
     
     if not IVASMS_EMAIL or not IVASMS_PASSWORD:
@@ -522,11 +518,11 @@ def login_ivasms():
     try:
         session = requests.Session()
         
-        # Get login page first
+        # Get login page
         login_page = session.get('https://ivasms.com/login', timeout=30)
         soup = BeautifulSoup(login_page.text, 'html.parser')
         
-        # Find CSRF token if exists
+        # Find CSRF token
         csrf_token = None
         token_input = soup.find('input', {'name': 'csrf_token'})
         if token_input:
@@ -543,16 +539,14 @@ def login_ivasms():
         # Post login
         response = session.post('https://ivasms.com/login', data=login_data, timeout=30)
         
-        # Check if login successful
-        if 'dashboard' in response.url or 'sms' in response.url or response.status_code == 200:
+        if response.status_code == 200:
             SESSION_COOKIE = session.cookies.get_dict()
-            LAST_LOGIN_TIME = datetime.now().strftime('%H:%M:%S %d/%m')
+            LAST_LOGIN_TIME = datetime.now().strftime('%H:%M:%S')
             LOGIN_STATUS = True
-            print(f"✅ Login successful at {LAST_LOGIN_TIME}")
+            print(f"✅ Login successful")
             return True
         else:
             LOGIN_STATUS = False
-            print("❌ Login failed")
             return False
             
     except Exception as e:
@@ -561,7 +555,7 @@ def login_ivasms():
         return False
 
 def get_numbers_from_ivasms():
-    """Fetch numbers from iVASMS 'My Numbers' page"""
+    """Fetch numbers from iVASMS My Numbers page"""
     global SESSION_COOKIE, LOGIN_STATUS
     
     if not SESSION_COOKIE or not LOGIN_STATUS:
@@ -572,103 +566,86 @@ def get_numbers_from_ivasms():
         session = requests.Session()
         session.cookies.update(SESSION_COOKIE)
         
-        # Try to get My Numbers page
-        urls_to_try = [
-            'https://www.ivasms.com/portal/live/my_sms',
-            'https://ivasms.com/numbers',
-            'https://ivasms.com/my-numbers',
-            'https://ivasms.com/dashboard'
-        ]
+        # Get the My Numbers page
+        response = session.get('https://www.ivasms.com/portal/live/my_sms', timeout=30)
         
-        response = None
-        for url in urls_to_try:
-            try:
-                response = session.get(url, timeout=30)
-                if response.status_code == 200:
-                    print(f"✅ Found numbers page: {url}")
-                    break
-            except:
-                continue
+        if response.status_code != 200:
+            response = session.get('https://ivasms.com/numbers', timeout=30)
         
-        if not response or response.status_code != 200:
+        if response.status_code != 200:
             return []
         
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Find all phone numbers
+        # Find all phone numbers - look for pattern 2137xxxxx or 923xxxxx
+        page_text = response.text
+        
+        # Pattern for Algeria numbers (2137...)
+        algeria_pattern = r'2137\d{8}'
+        # Pattern for Pakistan numbers (923...)
+        pakistan_pattern = r'923\d{9}'
+        
         numbers_found = []
         
-        # Look for phone number patterns in various elements
-        all_text = soup.get_text()
+        # Find all Algeria numbers
+        algeria_matches = re.findall(algeria_pattern, page_text)
+        for num in algeria_matches:
+            formatted = '+' + num
+            if formatted not in [n['number'] for n in numbers_found]:
+                numbers_found.append({
+                    'number': formatted,
+                    'country': 'Algeria'
+                })
         
-        # Pattern for phone numbers (various formats)
-        phone_patterns = [
-            r'\b2137\d{8}\b',  # Algeria numbers (2137...)
-            r'\b923\d{9}\b',    # Pakistan numbers (923...)
-            r'\b966\d{8}\b',    # Saudi numbers
-            r'\b\+\d{10,15}\b', # International format
-            r'\b\d{10,15}\b'    # Plain digits
-        ]
+        # Find all Pakistan numbers
+        pakistan_matches = re.findall(pakistan_pattern, page_text)
+        for num in pakistan_matches:
+            formatted = '+' + num
+            if formatted not in [n['number'] for n in numbers_found]:
+                numbers_found.append({
+                    'number': formatted,
+                    'country': 'Pakistan'
+                })
         
-        # Also look in specific elements that might contain numbers
-        number_elements = soup.find_all(['div', 'li', 'span', 'td', 'a'], class_=re.compile(r'number|phone|num', re.I))
-        
-        if number_elements:
-            for elem in number_elements:
-                text = elem.get_text()
-                for pattern in phone_patterns:
-                    matches = re.findall(pattern, text)
-                    for match in matches:
-                        if len(match) >= 10 and match not in numbers_found:
-                            # Format the number
-                            if not match.startswith('+'):
-                                if match.startswith('2137'):
-                                    formatted = '+' + match
-                                elif match.startswith('923'):
-                                    formatted = '+' + match
-                                else:
-                                    formatted = match
-                            else:
-                                formatted = match
-                            
-                            # Detect country
-                            country = 'Unknown'
-                            if formatted.startswith('+213'):
-                                country = 'Algeria'
-                            elif formatted.startswith('+92'):
-                                country = 'Pakistan'
-                            elif formatted.startswith('+966'):
-                                country = 'Saudi Arabia'
-                            
-                            numbers_found.append({
-                                'number': formatted,
-                                'country': country,
-                                'source': 'iVASMS'
-                            })
-        
-        # If no numbers found with specific elements, search entire page
-        if not numbers_found:
-            for pattern in phone_patterns:
-                matches = re.findall(pattern, all_text)
-                for match in matches:
-                    if len(match) >= 10:
-                        formatted = match if match.startswith('+') else '+' + match if match.startswith('213') or match.startswith('923') else match
+        # Also look for numbers in divs with specific classes
+        number_divs = soup.find_all(['div', 'li', 'span'], class_=re.compile(r'number|phone|num', re.I))
+        for div in number_divs:
+            text = div.get_text()
+            # Find any 10-15 digit numbers
+            numbers_in_text = re.findall(r'\b\d{10,15}\b', text)
+            for num in numbers_in_text:
+                if num.startswith('2137') or num.startswith('923'):
+                    formatted = '+' + num
+                    if formatted not in [n['number'] for n in numbers_found]:
+                        country = 'Algeria' if num.startswith('2137') else 'Pakistan' if num.startswith('923') else 'Unknown'
                         numbers_found.append({
                             'number': formatted,
-                            'country': 'Unknown',
-                            'source': 'iVASMS'
+                            'country': country
                         })
         
-        # Remove duplicates
-        seen = set()
-        unique_numbers = []
-        for num in numbers_found:
-            if num['number'] not in seen:
-                seen.add(num['number'])
-                unique_numbers.append(num)
+        # Also look for numbers in list items
+        list_items = soup.find_all('li')
+        for li in list_items:
+            text = li.get_text()
+            # Check for numbers in format like "213770660009"
+            clean_text = text.strip()
+            if re.match(r'^2137\d{8}$', clean_text):
+                formatted = '+' + clean_text
+                if formatted not in [n['number'] for n in numbers_found]:
+                    numbers_found.append({
+                        'number': formatted,
+                        'country': 'Algeria'
+                    })
+            elif re.match(r'^923\d{9}$', clean_text):
+                formatted = '+' + clean_text
+                if formatted not in [n['number'] for n in numbers_found]:
+                    numbers_found.append({
+                        'number': formatted,
+                        'country': 'Pakistan'
+                    })
         
-        print(f"✅ Found {len(unique_numbers)} numbers from iVASMS")
-        return unique_numbers
+        print(f"✅ Found {len(numbers_found)} numbers from iVASMS")
+        return numbers_found
         
     except Exception as e:
         print(f"Fetch numbers error: {e}")
@@ -686,32 +663,29 @@ def get_otps_from_ivasms():
         session = requests.Session()
         session.cookies.update(SESSION_COOKIE)
         
-        # Try to get SMS page
         response = session.get('https://ivasms.com/sms', timeout=30)
         
         if response.status_code != 200:
             response = session.get('https://ivasms.com/dashboard', timeout=30)
         
+        if response.status_code != 200:
+            return []
+        
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Try different selectors for SMS messages
+        # Find SMS messages
         messages = []
-        selectors = [
-            'div.sms-message',
-            'div.message',
-            'li.sms-item',
-            'div.msg-item',
-            'div.message-content'
-        ]
         
-        for selector in selectors:
+        # Try different selectors
+        for selector in ['div.sms-message', 'div.message', 'li.sms-item', 'div.msg-item', '.message-content']:
             found = soup.select(selector)
             if found:
                 messages = found
                 break
         
         if not messages:
-            all_elements = soup.find_all(['div', 'li', 'p', 'span', 'td'])
+            # Look for any element with OTP pattern
+            all_elements = soup.find_all(['div', 'li', 'p', 'span'])
             for elem in all_elements:
                 text = elem.get_text()
                 if re.search(r'\b\d{4,6}\b', text) and len(text) < 300:
@@ -734,7 +708,7 @@ def get_otps_from_ivasms():
                 if service_match:
                     service = service_match.group(1)
                 else:
-                    common_services = ['Amazon', 'Google', 'Facebook', 'PayPal', 'Apple', 'Microsoft', 'WhatsApp', 'Instagram', 'Uber', 'Netflix']
+                    common_services = ['Amazon', 'Google', 'Facebook', 'PayPal', 'Apple', 'WhatsApp', 'Instagram']
                     for s in common_services:
                         if s.lower() in text.lower():
                             service = s
@@ -745,7 +719,7 @@ def get_otps_from_ivasms():
                     'text': text[:200],
                     'phone': phone,
                     'service': service,
-                    'time': datetime.now().strftime('%H:%M:%S %d/%m/%Y')
+                    'time': datetime.now().strftime('%H:%M:%S %d/%m')
                 })
         
         return otps_found
@@ -757,48 +731,40 @@ def get_otps_from_ivasms():
         return []
 
 def auto_sync_numbers():
-    """Background thread to sync numbers from iVASMS"""
+    """Background thread to sync numbers"""
     global numbers_list, LAST_NUMBERS_SYNC
     while True:
-        time.sleep(1800)  # Every 30 minutes
-        print("🔄 Auto-syncing numbers from iVASMS...")
+        time.sleep(1800)  # 30 minutes
+        print("🔄 Auto-syncing numbers...")
         if LOGIN_STATUS:
             new_numbers = get_numbers_from_ivasms()
             if new_numbers:
                 numbers_list = new_numbers
-                LAST_NUMBERS_SYNC = datetime.now().strftime('%H:%M:%S %d/%m')
+                LAST_NUMBERS_SYNC = datetime.now().strftime('%H:%M:%S')
                 print(f"✅ Synced {len(numbers_list)} numbers")
-            else:
-                print("⚠️ No numbers found or sync failed")
         else:
-            print("⚠️ Not logged in, cannot sync numbers")
+            login_ivasms()
 
 def auto_refresh_login():
     """Background thread to keep login alive"""
-    global LOGIN_STATUS
     while True:
-        time.sleep(600)  # Every 10 minutes
+        time.sleep(600)  # 10 minutes
         print("🔄 Auto-refreshing login...")
-        if login_ivasms():
-            print("✅ Login auto-refreshed successfully")
-        else:
-            print("❌ Auto-refresh login failed")
+        login_ivasms()
 
 # Start background threads
 if IVASMS_EMAIL and IVASMS_PASSWORD:
-    login_ivasms()  # Initial login
+    login_ivasms()
     
-    # Start auto-refresh login thread
     refresh_thread = threading.Thread(target=auto_refresh_login, daemon=True)
     refresh_thread.start()
     
-    # Start auto-sync numbers thread
     sync_thread = threading.Thread(target=auto_sync_numbers, daemon=True)
     sync_thread.start()
     
     # Initial numbers sync
     numbers_list = get_numbers_from_ivasms()
-    LAST_NUMBERS_SYNC = datetime.now().strftime('%H:%M:%S %d/%m')
+    LAST_NUMBERS_SYNC = datetime.now().strftime('%H:%M:%S')
 
 LAST_CHECK_TIME = None
 
@@ -820,7 +786,7 @@ def sync_numbers():
     new_numbers = get_numbers_from_ivasms()
     if new_numbers:
         numbers_list = new_numbers
-        LAST_NUMBERS_SYNC = datetime.now().strftime('%H:%M:%S %d/%m')
+        LAST_NUMBERS_SYNC = datetime.now().strftime('%H:%M:%S')
         return jsonify({
             'status': 'success',
             'total_numbers': len(numbers_list),
@@ -889,6 +855,5 @@ def clear():
     otp_cache = set()
     return jsonify({'status': 'cleared'})
 
-# For local testing
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
