@@ -574,7 +574,7 @@ def get_numbers_from_ivasms():
         
         # Try to get My Numbers page
         urls_to_try = [
-            'https://ivasms.com/portal/live/m',
+            'https://www.ivasms.com/portal/live/my_sms',
             'https://ivasms.com/numbers',
             'https://ivasms.com/my-numbers',
             'https://ivasms.com/dashboard'
