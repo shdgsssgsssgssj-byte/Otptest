@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>IVAS SMS Portal · OTP Manager</title>
+    <!-- Font Awesome 6 (free) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f1f5f9;
+            color: #0f172a;
+            padding: 2rem 1.5rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* header & cards */
+        .header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            gap: 1rem;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .status-badge {
+            background: white;
+            border-radius: 40px;
+            padding: 0.3rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.03), 0 2px 6px rgba(0,0,0,0.05);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            transition: all 0.2s;
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-left: 4px solid #3b82f6;
+            padding-left: 0.8rem;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 1.8rem;
+        }
+
+        @media (max-width: 800px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            body { padding: 1.2rem; }
+        }
+
+        /* forms & inputs */
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            font-weight: 500;
+            font-size: 0.85rem;
+            display: block;
+            margin-bottom: 0.3rem;
+            color: #334155;
+        }
+
+        textarea, input {
+            width: 100%;
+            padding: 0.7rem 1rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 16px;
+            font-family: 'Inter', monospace;
+            font-size: 0.85rem;
+            background: #fefefe;
+            transition: 0.2s;
+        }
+
+        textarea:focus, input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+        }
+
+        button {
+            background: #1e293b;
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 40px;
+            font-weight: 500;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        button.primary {
+            background: #2563eb;
+        }
+        button.primary:hover { background: #1d4ed8; transform: scale(0.98);}
+        button.outline {
+            background: white;
+            border: 1px solid #cbd5e1;
+            color: #1e293b;
+        }
+        button.outline:hover { background: #f8fafc;}
+
+        .action-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin: 1rem 0 1.2rem;
+            align-items: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 0.75rem 0.5rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .sms-message {
+            max-width: 320px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: monospace;
+            background: #f1f5f9;
+            padding: 0.2rem 0.4rem;
+            border-radius: 12px;
+        }
+
+        .badge {
+            background: #e2e8f0;
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 2rem;
+            color: #475569;
+        }
+
+        .error-toast {
+            background: #fee2e2;
+            border-left: 5px solid #dc2626;
+            padding: 0.8rem;
+            border-radius: 16px;
+            margin: 1rem 0;
+        }
+
+        .success-toast {
+            background: #e0f2fe;
+            border-left: 5px solid #0284c7;
+        }
+
+        .footer-note {
+            font-size: 0.7rem;
+            text-align: center;
+            color: #64748b;
+            margin-top: 2rem;
+        }
+        .mono {
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+        }
+        .number-cell {
+            font-weight: 600;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1><i class="fas fa-envelope-open-text"></i> IVAS SMS Dashboard</h1>
+        <div class="status-badge" id="sessionStatusBadge">
+            <i class="fas fa-circle" style="font-size: 0.7rem; color:#94a3b8;"></i> 
+            <span id="sessionStatusText">Checking session...</span>
+        </div>
+    </div>
+
+    <!-- session cookies update panel -->
+    <div class="card">
+        <div class="card-title"><i class="fas fa-cookie-bite"></i> Session Manager (Cookies)</div>
+        <div class="grid-2">
+            <div>
+                <div class="input-group">
+                    <label>XSRF-TOKEN <span style="font-weight:normal;">(raw / encoded)</span></label>
+                    <textarea id="xsrfInput" rows="2" placeholder="eyJpdiI6InFEc3M1R2lmTFVRTmpn..."></textarea>
+                </div>
+                <div class="input-group">
+                    <label>ivas_sms_session</label>
+                    <textarea id="sessionInput" rows="2" placeholder="eyJpdiI6InAzWkxGdzU2WjhGbENq..."></textarea>
+                </div>
+                <div class="action-bar">
+                    <button id="updateCookiesBtn" class="primary"><i class="fas fa-save"></i> Update Session</button>
+                    <button id="checkSessionBtn" class="outline"><i class="fas fa-sync-alt"></i> Verify Status</button>
+                </div>
+                <div id="sessionFeedback" class="mono" style="font-size:0.75rem; color:#2c3e66;"></div>
+            </div>
+            <div style="background: #f8fafc; border-radius: 20px; padding: 1rem;">
+                <i class="fas fa-info-circle"></i> <strong>How to get fresh cookies</strong>
+                <ul style="margin-top: 0.6rem; margin-left: 1.2rem; font-size:0.8rem;">
+                    <li>1. Login to <strong>https://www.ivasms.com/portal</strong> (Chrome/Firefox)</li>
+                    <li>2. Open DevTools → Network tab → any request (e.g., /portal)</li>
+                    <li>3. Copy <code>XSRF-TOKEN</code> and <code>ivas_sms_session</code> from Request Headers → Cookie</li>
+                    <li>4. Paste above and click "Update Session"</li>
+                </ul>
+                <div class="badge" style="margin-top: 0.8rem;"><i class="fas fa-clock"></i> Tokens expire → re-update when API returns 401</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- action buttons: fetch numbers / fetch sms -->
+    <div class="card">
+        <div class="card-title"><i class="fas fa-database"></i> Data Fetch</div>
+        <div class="action-bar" style="margin-bottom:0;">
+            <button id="fetchNumbersBtn" class="primary"><i class="fas fa-phone-alt"></i> Fetch All Numbers</button>
+            <button id="fetchSmsBtn" class="primary" style="background:#0f3b5c;"><i class="fas fa-envelope"></i> Fetch Today's SMS (OTP)</button>
+        </div>
+        <div id="dataFetchLoader" style="display: none;" class="loading"><i class="fas fa-spinner fa-pulse"></i> Loading...</div>
+        <div id="apiErrorMessage" class="error-toast" style="display: none;"></div>
+    </div>
+
+    <!-- NUMBERS TABLE -->
+    <div class="card" id="numbersCard" style="display: none;">
+        <div class="card-title"><i class="fas fa-list-ul"></i> Registered Numbers <span id="numbersCount"></span></div>
+        <div style="overflow-x: auto;">
+            <table id="numbersTable">
+                <thead>
+                    <tr><th>Range</th><th>Number</th><th>Status / Type</th><th>Details</th></tr>
+                </thead>
+                <tbody id="numbersTbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- SMS / OTP TABLE -->
+    <div class="card" id="smsCard" style="display: none;">
+        <div class="card-title"><i class="fas fa-sms"></i> 📨 Incoming SMS (Today) <span id="smsCount"></span></div>
+        <div style="overflow-x: auto;">
+            <table id="smsTable">
+                <thead><tr><th>Date & Time</th><th>Range</th><th>Number</th><th>Sender</th><th>Message (OTP / Text)</th></tr></thead>
+                <tbody id="smsTbody"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="footer-note">
+        <i class="fas fa-shield-alt"></i> Proxy-less client-side simulation — all requests go through a CORS-enabled backend proxy? <br>
+        ⚠️ This HTML uses a <strong>CORS proxy / vercel serverless bridge emulation</strong>. Since original Node.js runs on server, we call your own backend endpoint.
+        <br> <strong>For pure static HTML on Vercel:</strong> Deploy this as static + create a serverless function (api/ivas.js) that runs the original Node logic. This UI can then fetch from `/api/ivas?type=numbers`.
+        <br> But this interactive tool shows you the <strong>exact logic & data structure</strong> — you can connect to your real deployed backend.
+    </div>
+</div>
+
+<script>
+    // =============== CONFIGURATION ===============
+    // 🔁 IMPORTANT: If you have deployed your original Node.js backend (Express) on Vercel as serverless function,
+    // set API_BASE to your actual endpoint. For demo purposes, we emulate local session + direct fetch simulation
+    // but to fully replace backend, we'll use a mock or direct proxy? Actually we need to run the exact logic.
+    // Since original code requires node modules (https, zlib) & server-side scraping, we CANNOT run inside browser directly.
+    // However this HTML is a *management UI* that expects your backend API running on same origin or CORS enabled.
+    // Provide your Vercel deployment URL or localhost:3000/api/ivasms
+    // For demonstration, I'll create a fetch wrapper that calls a backend endpoint you specify.
+    
+    // 👇 SET YOUR ACTUAL BACKEND URL (deployed express on vercel or local)
+    // example: if you deploy the original node router as serverless function under /api/ivasms
+    const API_BASE_URL = "";   // e.g. "https://your-app.vercel.app/api/ivasms" or "" to use relative
+    // if empty, we assume the same origin + path "/api/ivasms" (make sure you've deployed the node logic)
+    // For this HTML to fully work, you need the actual IVAS backend proxy running on server.
+    
+    let currentCookies = {
+        "XSRF-TOKEN": "",
+        "ivas_sms_session": ""
+    };
+    
+    // Helper to read from localStorage
+    function loadStoredCookies() {
+        try {
+            const stored = localStorage.getItem("ivas_cookies");
+            if(stored) {
+                const parsed = JSON.parse(stored);
+                if(parsed["XSRF-TOKEN"]) document.getElementById("xsrfInput").value = parsed["XSRF-TOKEN"];
+                if(parsed["ivas_sms_session"]) document.getElementById("sessionInput").value = parsed["ivas_sms_session"];
+                currentCookies = parsed;
+            }
+        } catch(e) {}
+    }
+    
+    function saveCookiesToLocal() {
+        localStorage.setItem("ivas_cookies", JSON.stringify(currentCookies));
+    }
+    
+    function updateCookiesFromInput() {
+        const xsrfVal = document.getElementById("xsrfInput").value.trim();
+        const sessVal = document.getElementById("sessionInput").value.trim();
+        if(!xsrfVal && !sessVal) {
+            showToast("Please paste both cookies", "error");
+            return false;
+        }
+        if(xsrfVal) currentCookies["XSRF-TOKEN"] = xsrfVal;
+        if(sessVal) currentCookies["ivas_sms_session"] = sessVal;
+        saveCookiesToLocal();
+        document.getElementById("sessionFeedback").innerHTML = `<i class="fas fa-check-circle" style="color:#10b981;"></i> Cookies updated in memory & local storage.`;
+        return true;
+    }
+    
+    async function checkSessionStatus() {
+        const endpoint = buildApiUrl("status");
+        if(!endpoint) {
+            document.getElementById("sessionStatusText").innerText = "⚠️ No backend URL";
+            return;
+        }
+        try {
+            const res = await fetch(endpoint);
+            const data = await res.json();
+            if(data.status && data.status.includes("active")) {
+                document.getElementById("sessionStatusBadge").style.background = "#e6f7e6";
+                document.getElementById("sessionStatusText").innerHTML = `<i class="fas fa-circle" style="color:#22c55e;"></i> ${data.status}`;
+            } else {
+                document.getElementById("sessionStatusText").innerHTML = `<i class="fas fa-circle" style="color:#ef4444;"></i> ${data.status || "Expired"}`;
+            }
+        } catch(err) {
+            document.getElementById("sessionStatusText").innerText = "Cannot connect to API";
+            console.warn(err);
+        }
+    }
+    
+    function buildApiUrl(path) {
+        let base = API_BASE_URL;
+        if(!base) base = window.location.origin + "/api/ivasms";
+        // remove trailing slash
+        if(base.endsWith("/")) base = base.slice(0,-1);
+        return `${base}/${path}`;
+    }
+    
+    async function fetchNumbers() {
+        showLoader(true);
+        hideError();
+        const endpoint = buildApiUrl("?type=numbers");
+        if(!endpoint) { showLoader(false); showError("API base URL not configured. Set API_BASE_URL or deploy backend."); return; }
+        try {
+            const resp = await fetch(endpoint);
+            if(resp.status === 401) {
+                showError("Session expired — please update XSRF-TOKEN and session cookies using the panel above.");
+                showLoader(false);
+                return;
+            }
+            const data = await resp.json();
+            if(data.error) throw new Error(data.error);
+            renderNumbers(data);
+        } catch(err) {
+            showError("Numbers fetch failed: " + err.message);
+        } finally {
+            showLoader(false);
+        }
+    }
+    
+    async function fetchSms() {
+        showLoader(true);
+        hideError();
+        const endpoint = buildApiUrl("?type=sms");
+        if(!endpoint) { showLoader(false); showError("API not configured"); return; }
+        try {
+            const resp = await fetch(endpoint);
+            if(resp.status === 401) {
+                showError("Session expired — update cookies");
+                showLoader(false);
+                return;
+            }
+            const data = await resp.json();
+            if(data.error) throw new Error(data.error);
+            renderSms(data);
+        } catch(err) {
+            showError("SMS fetch error: " + err.message);
+        } finally {
+            showLoader(false);
+        }
+    }
+    
+    function renderNumbers(data) {
+        const numbersCard = document.getElementById("numbersCard");
+        const tbody = document.getElementById("numbersTbody");
+        let rowsHtml = "";
+        let totalCount = 0;
+        // data structure can be { aaData: [ [range, "", number, "Weekly", ""] ] } or direct array
+        let items = [];
+        if(data.aaData && Array.isArray(data.aaData)) items = data.aaData;
+        else if(data.data && Array.isArray(data.data)) items = data.data.map(r => [r.range, "", r.Number, "Active", ""]);
+        else if(Array.isArray(data)) items = data;
+        
+        for(let row of items) {
+            if(!Array.isArray(row) && typeof row === 'object') {
+                // fallback object
+                const num = row.number || row.Number || row.number_id;
+                const range = row.range || row.Range || "";
+                rowsHtml += `<tr><td>${escapeHtml(range)}</td><td class="number-cell">${escapeHtml(num)}</td><td><span class="badge">Active</span></td><td>IVAS</td></tr>`;
+                totalCount++;
+            } else {
+                // array format: [range, "", number, status, extra]
+                const range = row[0] || "";
+                const number = row[2] || (row[1] && row[1].toString().match(/\d+/) ? row[1] : row[0]);
+                rowsHtml += `<tr><td>${escapeHtml(range)}</td><td class="number-cell">${escapeHtml(number)}</td><td><span class="badge">Active</span></td><td>${escapeHtml(row[3] || "A2P")}</td></tr>`;
+                totalCount++;
+            }
+        }
+        if(totalCount === 0) rowsHtml = `<tr><td colspan="4" style="text-align:center;">No numbers found. Update cookies or check portal.</td></tr>`;
+        tbody.innerHTML = rowsHtml;
+        document.getElementById("numbersCount").innerHTML = `(${totalCount})`;
+        numbersCard.style.display = "block";
+        document.getElementById("smsCard").style.display = "none";
+    }
+    
+    function renderSms(data) {
+        const smsCard = document.getElementById("smsCard");
+        const tbody = document.getElementById("smsTbody");
+        let rowsHtml = "";
+        let messages = [];
+        if(data.aaData && Array.isArray(data.aaData)) messages = data.aaData;
+        else if(data.data && Array.isArray(data.data)) messages = data.data;
+        else if(Array.isArray(data)) messages = data;
+        
+        for(let msg of messages) {
+            let date = "", range = "", number = "", sender = "", message = "";
+            if(Array.isArray(msg)) {
+                // expected structure: [datetime, range, number, sender, messageText, ...]
+                date = msg[0] || "";
+                range = msg[1] || "";
+                number = msg[2] || "";
+                sender = msg[3] || "";
+                message = msg[4] || "";
+                if(!message && msg[3] && !msg[4]) { message = msg[3]; sender = "SMS"; }
+            } else {
+                date = msg.date || msg.datetime || "";
+                range = msg.range || "";
+                number = msg.number || msg.Number || "";
+                sender = msg.sender || "";
+                message = msg.message || msg.text || msg.msg || "";
+            }
+            rowsHtml += `<tr>
+                <td style="white-space:nowrap;">${escapeHtml(date)}</td>
+                <td>${escapeHtml(range)}</td>
+                <td class="number-cell">${escapeHtml(number)}</td>
+                <td>${escapeHtml(sender)}</td>
+                <td class="sms-message">${escapeHtml(message).substring(0, 200)}</td>
+            </tr>`;
+        }
+        if(messages.length === 0) rowsHtml = `<tr><td colspan="5" style="text-align:center;">📭 No OTP / SMS received today. Ensure numbers are active.</td></tr>`;
+        tbody.innerHTML = rowsHtml;
+        document.getElementById("smsCount").innerHTML = `(${messages.length})`;
+        smsCard.style.display = "block";
+        document.getElementById("numbersCard").style.display = "none";
+    }
+    
+    function showLoader(show) {
+        document.getElementById("dataFetchLoader").style.display = show ? "flex" : "none";
+    }
+    
+    function showError(msg) {
+        const errDiv = document.getElementById("apiErrorMessage");
+        errDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${msg}`;
+        errDiv.style.display = "block";
+        setTimeout(() => { if(errDiv) errDiv.style.display = "none"; }, 5000);
+    }
+    function hideError() {
+        document.getElementById("apiErrorMessage").style.display = "none";
+    }
+    function showToast(msg, type) {
+        const errDiv = document.getElementById("apiErrorMessage");
+        errDiv.innerHTML = `<i class="fas fa-info-circle"></i> ${msg}`;
+        errDiv.className = "error-toast " + (type === "error" ? "" : "success-toast");
+        errDiv.style.display = "block";
+        setTimeout(() => errDiv.style.display = "none", 3000);
+    }
+    
+    function escapeHtml(str) { 
+        if(!str) return "";
+        return String(str).replace(/[&<>]/g, function(m) {
+            if(m === '&') return '&amp;';
+            if(m === '<') return '&lt;';
+            if(m === '>') return '&gt;';
+            return m;
+        }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+            return c;
+        });
+    }
+    
+    // Also provide a way to send cookies along requests? The backend should read cookies from request headers.
+    // For the Node backend to receive cookies, we must attach them via fetch headers.
+    // The original backend reads cookies from req.headers.cookie. So we must send them if we call the API.
+    // Let's enhance fetch wrapper to include currentCookies in request headers when calling /api/ivasms endpoints.
+    // Override fetch for internal calls.
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+        if(url.includes("/api/ivasms") && (currentCookies["XSRF-TOKEN"] || currentCookies["ivas_sms_session"])) {
+            const cookieStr = Object.entries(currentCookies).map(([k,v]) => `${k}=${encodeURIComponent(v)}`).join("; ");
+            options.headers = options.headers || {};
+            options.headers["Cookie"] = cookieStr;
+            // also add X-XSRF-TOKEN header
+            if(currentCookies["XSRF-TOKEN"]) {
+                let rawXsrf = currentCookies["XSRF-TOKEN"];
+                try { rawXsrf = decodeURIComponent(rawXsrf); } catch(e) {}
+                options.headers["X-XSRF-TOKEN"] = rawXsrf;
+                options.headers["X-CSRF-TOKEN"] = rawXsrf;
+            }
+        }
+        return originalFetch(url, options);
+    };
+    
+    // Event listeners
+    document.getElementById("updateCookiesBtn").addEventListener("click", () => {
+        if(updateCookiesFromInput()) {
+            showToast("Cookies stored. Use 'Verify Status' to test.", "success");
+        }
+    });
+    document.getElementById("checkSessionBtn").addEventListener("click", checkSessionStatus);
+    document.getElementById("fetchNumbersBtn").addEventListener("click", fetchNumbers);
+    document.getElementById("fetchSmsBtn").addEventListener("click", fetchSms);
+    
+    // load existing cookies from localStorage
+    loadStoredCookies();
+    // attempt to check session on load if API base available
+    setTimeout(() => {
+        if(buildApiUrl("status")) checkSessionStatus();
+        else {
+            document.getElementById("sessionStatusText").innerText = "⚠️ Set API_BASE_URL";
+        }
+    }, 500);
+    
+    // Additional info: Show that you need to deploy original Node.js logic as serverless function.
+    console.log("UI ready — make sure your backend (ivasms router) is deployed at /api/ivasms");
+</script>
+</body>
+</html>
